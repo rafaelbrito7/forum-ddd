@@ -2,6 +2,8 @@ import { InMemoryAnswersRepository } from 'test/repositories/in-memory-answers-r
 import { makeAnswer } from '../../enterprise/factories/make-answer'
 import { EditAnswerUseCase } from './edit-answer'
 import { UniqueEntityID } from '@/core/entities/unique-entity-id'
+import { UnauthorizedError } from './errors/unauthorized-error'
+import { ResourceNotFoundError } from './errors/resource-not-found-error'
 
 let inMemoryAnswersRepository: InMemoryAnswersRepository
 let sut: EditAnswerUseCase
@@ -12,7 +14,7 @@ describe('Edit Answer', () => {
     sut = new EditAnswerUseCase(inMemoryAnswersRepository)
   })
 
-  it('should be able to edit a answer', async () => {
+  it('should be able to edit an answer', async () => {
     const newAnswer = makeAnswer(
       { authorId: new UniqueEntityID('author-1') },
       new UniqueEntityID('answer-1'),
@@ -20,18 +22,32 @@ describe('Edit Answer', () => {
 
     await inMemoryAnswersRepository.create(newAnswer)
 
-    await sut.execute({
+    const result = await sut.execute({
       answerId: newAnswer.id.toValue(),
       authorId: 'author-1',
       content: 'Conteúdo teste',
     })
 
+    expect(result.isRight()).toEqual(true)
+    expect(result.isLeft()).toEqual(false)
     expect(inMemoryAnswersRepository.items[0]).toMatchObject({
       content: 'Conteúdo teste',
     })
   })
 
-  it('should not be able to edit a another users answer', async () => {
+  it('should not be able to edit an answer that does not exist', async () => {
+    const result = await sut.execute({
+      answerId: 'answer-1',
+      authorId: 'author-1',
+      content: 'Conteúdo teste',
+    })
+
+    expect(result.isLeft()).toEqual(true)
+    expect(result.isRight()).toEqual(false)
+    expect(result.value).toBeInstanceOf(ResourceNotFoundError)
+  })
+
+  it('should not be able to edit another users answer', async () => {
     const newAnswer = makeAnswer(
       { authorId: new UniqueEntityID('author-1') },
       new UniqueEntityID('answer-1'),
@@ -39,12 +55,14 @@ describe('Edit Answer', () => {
 
     await inMemoryAnswersRepository.create(newAnswer)
 
-    expect(() => {
-      return sut.execute({
-        answerId: 'answer-1',
-        authorId: 'author-2',
-        content: 'Conteúdo teste',
-      })
-    }).rejects.toBeInstanceOf(Error)
+    const result = await sut.execute({
+      answerId: 'answer-1',
+      authorId: 'author-2',
+      content: 'Conteúdo teste',
+    })
+
+    expect(result.isLeft()).toEqual(true)
+    expect(result.isRight()).toEqual(false)
+    expect(result.value).toBeInstanceOf(UnauthorizedError)
   })
 })

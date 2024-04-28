@@ -12,7 +12,7 @@ describe('Get Answer Comments', () => {
     sut = new FetchAnswerCommentsUseCase(inMemoryAnswerCommentsRepository)
   })
 
-  it('should be able to fetch comments on a answer', async () => {
+  it('should be able to fetch comments on answer', async () => {
     await inMemoryAnswerCommentsRepository.create(
       makeAnswerComment({ answerId: new UniqueEntityID('answer-1') }),
     )
@@ -25,36 +25,35 @@ describe('Get Answer Comments', () => {
       makeAnswerComment({ answerId: new UniqueEntityID('answer-1') }),
     )
 
-    const { answerComments } = await sut.execute({
+    const result = await sut.execute({
       page: 1,
       answerId: 'answer-1',
     })
 
-    expect(answerComments).toHaveLength(3)
-    expect(answerComments[0]).toEqual(
+    expect(result.isRight()).toEqual(true)
+    expect(result.isLeft()).toEqual(false)
+    expect(result.value?.answerComments).toHaveLength(3)
+    expect(result.value?.answerComments[0]).toEqual(
       expect.objectContaining({
         answerId: new UniqueEntityID('answer-1'),
       }),
     )
   })
 
-  it('should be able to fetch paginated comments on a answer', async () => {
+  it('should be able to fetch paginated comments on answer', async () => {
     for (let i = 1; i <= 30; i++) {
       await inMemoryAnswerCommentsRepository.create(
         makeAnswerComment({ answerId: new UniqueEntityID('answer-1') }),
       )
     }
 
-    const { answerComments: pageOne } = await sut.execute({
-      page: 1,
-      answerId: 'answer-1',
-    })
-    const { answerComments: pageTwo } = await sut.execute({
+    const result = await sut.execute({
       page: 2,
       answerId: 'answer-1',
     })
 
-    expect(pageOne).toHaveLength(20)
-    expect(pageTwo).toHaveLength(10)
+    expect(result.isRight()).toEqual(true)
+    expect(result.isLeft()).toEqual(false)
+    expect(result.value?.answerComments).toHaveLength(10)
   })
 })

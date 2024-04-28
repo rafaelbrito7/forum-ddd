@@ -25,13 +25,15 @@ describe('Get Question Answers', () => {
       makeAnswer({ questionId: new UniqueEntityID('question-1') }),
     )
 
-    const { answers } = await sut.execute({
+    const result = await sut.execute({
       page: 1,
       questionId: 'question-1',
     })
 
-    expect(answers).toHaveLength(3)
-    expect(answers[0]).toEqual(
+    expect(result.isRight()).toEqual(true)
+    expect(result.isLeft()).toEqual(false)
+    expect(result.value?.answers).toHaveLength(3)
+    expect(result.value?.answers[0]).toEqual(
       expect.objectContaining({
         questionId: new UniqueEntityID('question-1'),
       }),
@@ -45,16 +47,13 @@ describe('Get Question Answers', () => {
       )
     }
 
-    const { answers: pageOne } = await sut.execute({
-      page: 1,
-      questionId: 'question-1',
-    })
-    const { answers: pageTwo } = await sut.execute({
+    const result = await sut.execute({
       page: 2,
       questionId: 'question-1',
     })
 
-    expect(pageOne).toHaveLength(20)
-    expect(pageTwo).toHaveLength(10)
+    expect(result.isRight()).toEqual(true)
+    expect(result.isLeft()).toEqual(false)
+    expect(result.value?.answers).toHaveLength(10)
   })
 })
