@@ -4,28 +4,49 @@ import { EditAnswerUseCase } from './edit-answer'
 import { UniqueEntityID } from '@/core/entities/unique-entity-id'
 import { UnauthorizedError } from './errors/unauthorized-error'
 import { ResourceNotFoundError } from './errors/resource-not-found-error'
+import { InMemoryAnswerAttachmentsRepository } from 'test/repositories/in-memory-answer-attachments-repository'
+import { makeAnswerAttachment } from '../../enterprise/factories/make-answer-attachments'
 
 let inMemoryAnswersRepository: InMemoryAnswersRepository
+let inMemoryAnswerAttachmentsRepository: InMemoryAnswerAttachmentsRepository
 let sut: EditAnswerUseCase
 
 describe('Edit Answer', () => {
   beforeEach(() => {
-    inMemoryAnswersRepository = new InMemoryAnswersRepository()
-    sut = new EditAnswerUseCase(inMemoryAnswersRepository)
+    inMemoryAnswerAttachmentsRepository =
+      new InMemoryAnswerAttachmentsRepository()
+    inMemoryAnswersRepository = new InMemoryAnswersRepository(
+      inMemoryAnswerAttachmentsRepository,
+    )
+    sut = new EditAnswerUseCase(
+      inMemoryAnswersRepository,
+      inMemoryAnswerAttachmentsRepository,
+    )
   })
 
   it('should be able to edit an answer', async () => {
-    const newAnswer = makeAnswer(
+    const answer = makeAnswer(
       { authorId: new UniqueEntityID('author-1') },
       new UniqueEntityID('answer-1'),
     )
 
-    await inMemoryAnswersRepository.create(newAnswer)
+    await inMemoryAnswersRepository.create(answer)
+
+    makeAnswerAttachment({
+      answerId: answer.id,
+      attachmentId: new UniqueEntityID('1'),
+    })
+
+    makeAnswerAttachment({
+      answerId: answer.id,
+      attachmentId: new UniqueEntityID('2'),
+    })
 
     const result = await sut.execute({
-      answerId: newAnswer.id.toValue(),
+      answerId: answer.id.toValue(),
       authorId: 'author-1',
       content: 'Conteúdo teste',
+      attachmentsIds: ['1', '3'],
     })
 
     expect(result.isRight()).toEqual(true)
@@ -33,6 +54,18 @@ describe('Edit Answer', () => {
     expect(inMemoryAnswersRepository.items[0]).toMatchObject({
       content: 'Conteúdo teste',
     })
+    expect(
+      inMemoryAnswersRepository.items[0].attachments.currentItems,
+    ).toHaveLength(2)
+    expect(inMemoryAnswersRepository.items[0].attachments.currentItems).toEqual(
+      [
+        expect.objectContaining({ attachmentId: new UniqueEntityID('1') }),
+        expect.objectContaining({ attachmentId: new UniqueEntityID('3') }),
+      ],
+    )
+    if (result.isRight()) {
+      expect(inMemoryAnswersRepository.items[0]).toEqual(result.value?.answer)
+    }
   })
 
   it('should not be able to edit an answer that does not exist', async () => {
@@ -40,6 +73,7 @@ describe('Edit Answer', () => {
       answerId: 'answer-1',
       authorId: 'author-1',
       content: 'Conteúdo teste',
+      attachmentsIds: ['1', '2'],
     })
 
     expect(result.isLeft()).toEqual(true)
@@ -59,6 +93,7 @@ describe('Edit Answer', () => {
       answerId: 'answer-1',
       authorId: 'author-2',
       content: 'Conteúdo teste',
+      attachmentsIds: ['1', '2'],
     })
 
     expect(result.isLeft()).toEqual(true)

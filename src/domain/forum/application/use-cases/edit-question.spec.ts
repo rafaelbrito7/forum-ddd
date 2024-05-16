@@ -4,14 +4,26 @@ import { EditQuestionUseCase } from './edit-question'
 import { UniqueEntityID } from '@/core/entities/unique-entity-id'
 import { UnauthorizedError } from './errors/unauthorized-error'
 import { ResourceNotFoundError } from './errors/resource-not-found-error'
+import { InMemoryQuestionAttachmentsRepository } from 'test/repositories/in-memory-question-attachments-repository'
+import { makeQuestionAttachment } from '../../enterprise/factories/make-question-attachment'
 
 let inMemoryQuestionsRepository: InMemoryQuestionsRepository
+let inMemoryQuestionAttachmentsRepository: InMemoryQuestionAttachmentsRepository
 let sut: EditQuestionUseCase
 
 describe('Edit Question', () => {
   beforeEach(() => {
-    inMemoryQuestionsRepository = new InMemoryQuestionsRepository()
-    sut = new EditQuestionUseCase(inMemoryQuestionsRepository)
+    inMemoryQuestionAttachmentsRepository =
+      new InMemoryQuestionAttachmentsRepository()
+
+    inMemoryQuestionsRepository = new InMemoryQuestionsRepository(
+      inMemoryQuestionAttachmentsRepository,
+    )
+
+    sut = new EditQuestionUseCase(
+      inMemoryQuestionsRepository,
+      inMemoryQuestionAttachmentsRepository,
+    )
   })
 
   it('should be able to edit a question', async () => {
@@ -22,19 +34,36 @@ describe('Edit Question', () => {
 
     await inMemoryQuestionsRepository.create(newQuestion)
 
+    inMemoryQuestionAttachmentsRepository.items.push(
+      makeQuestionAttachment({
+        questionId: newQuestion.id,
+        attachmentId: new UniqueEntityID('1'),
+      }),
+      makeQuestionAttachment({
+        questionId: newQuestion.id,
+        attachmentId: new UniqueEntityID('2'),
+      }),
+    )
+
     const result = await sut.execute({
       questionId: newQuestion.id.toValue(),
       authorId: 'author-1',
       content: 'Conteúdo teste',
       title: 'Pergunta teste',
+      attachmentsIds: ['1', '3'],
     })
 
     expect(result.isRight()).toEqual(true)
     expect(result.isLeft()).toEqual(false)
-    expect(inMemoryQuestionsRepository.items[0]).toMatchObject({
-      content: 'Conteúdo teste',
-      title: 'Pergunta teste',
-    })
+    expect(
+      inMemoryQuestionsRepository.items[0].attachments.currentItems,
+    ).toHaveLength(2)
+    expect(
+      inMemoryQuestionsRepository.items[0].attachments.currentItems,
+    ).toEqual([
+      expect.objectContaining({ attachmentId: new UniqueEntityID('1') }),
+      expect.objectContaining({ attachmentId: new UniqueEntityID('3') }),
+    ])
   })
 
   it('should not be able to edit a question that does not exist', async () => {
@@ -43,6 +72,7 @@ describe('Edit Question', () => {
       authorId: 'author-1',
       content: 'Conteúdo teste',
       title: 'Pergunta teste',
+      attachmentsIds: [],
     })
 
     expect(result.isLeft()).toEqual(true)
@@ -63,6 +93,7 @@ describe('Edit Question', () => {
       authorId: 'author-2',
       content: 'Conteúdo teste',
       title: 'Pergunta teste',
+      attachmentsIds: [],
     })
 
     expect(result.isLeft()).toEqual(true)
